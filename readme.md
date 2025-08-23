@@ -23,7 +23,7 @@
   - mac: `scons platform=macos custom_api_file=extension_api.json -j10`
 
 
-## 编译:
+## 编译 (win 下 需调整 scons脚本 部分绝对路径 和 编译环境的path): 
   - `scons stage=openssl`
   - `scons stage=sqlcipher`
   - gdextension:
