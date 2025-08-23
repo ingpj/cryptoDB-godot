@@ -9,6 +9,7 @@
 *.tar.gz
 
 godot-cpp/
+src-cpp/gen/
 src_cpp/*.os
 src_cpp/*.obj
 
