@@ -1,5 +1,5 @@
-# readme
-
+## 关于
+使用了sqlcipher 静态集成 并对 godot 进行暴露
 ## 软件
 
 - 编译软件:
