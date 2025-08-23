@@ -5,6 +5,7 @@
 # addons/
 
 .vscode
+*.dblite
 *.tar.gz
 
 godot-cpp/
