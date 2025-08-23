@@ -1,0 +1,76 @@
+Import("env", "info")
+import os,sys,shutil
+
+# 添加 perl、nasm 进 scons path
+PERL_PATH = r"D:\LIB\perl\perl\bin"
+NASM_PATH = r"D:\LIB\nasm"
+env['ENV']['PATH'] = f"{PERL_PATH};{NASM_PATH};" + env['ENV']['PATH']
+# nmake 选择 x64位
+VCVARS64 = r'"D:\c++\vscommunity\VC\Auxiliary\Build\vcvars64.bat"'
+
+# 公共平台配置字典
+if info.system == "windows":
+    platform_config = {
+        "platform": "win32",
+        "ssl_lib_name": "libssl.lib",
+        "crypto_lib_name": "libcrypto.lib",
+        "configure_cmd": "perl Configure VC-WIN64A no-shared no-dso no-async",
+        "make_cmd": f'call {VCVARS64} && nmake',
+        # "make_cmd": 'nmake',
+        # "copy_cmd": "copy",
+        # "copy_include_cmd": "xcopy /E /I /Y",
+        "linkflags_extra": [],
+    }
+
+
+this_dir = Dir(".").abspath
+
+openssl_src = os.path.join(this_dir, "src")
+openssl_lib_dir = os.path.join(this_dir, "lib")
+openssl_include_dir = os.path.join(this_dir, "include")
+
+if not os.path.exists(openssl_lib_dir):
+    os.makedirs(openssl_lib_dir)
+
+if not os.path.exists(openssl_include_dir):
+    os.makedirs(openssl_include_dir)
+
+ssl_lib_name = platform_config["ssl_lib_name"]
+crypto_lib_name = platform_config["crypto_lib_name"]
+configure_cmd = platform_config["configure_cmd"]
+make_cmd = platform_config["make_cmd"]
+# copy_cmd = platform_config["copy_cmd"]
+# copy_include_cmd = platform_config["copy_include_cmd"]
+
+
+build_cmd = f"""
+cd {openssl_src} && \
+{configure_cmd} && \
+{make_cmd}
+"""
+
+# 编译任务：生成 libssl.lib 和 libcrypto.lib
+build_targets = [
+    File(os.path.join(openssl_src, ssl_lib_name)),
+    File(os.path.join(openssl_src, crypto_lib_name)),
+]
+
+env.Command(
+    target=build_targets,
+    source=None,
+    action=build_cmd
+)
+
+
+# 用 Install 拷贝库文件到 lib 目录
+installed_libs = env.Install(openssl_lib_dir, build_targets)
+
+
+
+# 拷贝 include 目录下所有文件
+include_src = os.path.join(openssl_src, "include")
+include_files = Glob(os.path.join(include_src, "**"), strings=True)
+installed_includes = env.Install(openssl_include_dir, include_files)
+
+# 让默认目标包含它们
+Default(installed_libs, installed_includes)

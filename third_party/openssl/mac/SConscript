@@ -1,0 +1,58 @@
+Import("env", "info")
+import os,sys
+
+if info.machine in ("arm64", "aarch64"):
+    configure_cmd = './Configure darwin64-arm64-cc no-shared no-dso no-async CFLAGS="-fPIC"'
+else:
+    configure_cmd = './Configure no-shared no-dso no-async CFLAGS="-fPIC"'
+
+platform_config = {
+    "platform": "darwin",
+    "ssl_lib_name": "libssl.a",
+    "crypto_lib_name": "libcrypto.a",
+    "configure_cmd": configure_cmd,
+    "make_cmd": "make -j",
+    "copy_cmd": "cp",
+    "copy_include_cmd": "cp -r",
+    "linkflags_extra": ["-ldl", "-lpthread", "-lz"],  # macOS 一般不需要 -ldl
+}
+
+
+
+this_dir = Dir(".").abspath
+
+openssl_src = os.path.join(this_dir, "src")
+openssl_lib_dir = os.path.join(this_dir, "lib")
+openssl_include_dir = os.path.join(this_dir, "include")
+
+if not os.path.exists(openssl_lib_dir):
+    os.makedirs(openssl_lib_dir)
+
+if not os.path.exists(openssl_include_dir):
+    os.makedirs(openssl_include_dir)
+
+ssl_lib_name = platform_config["ssl_lib_name"]
+crypto_lib_name = platform_config["crypto_lib_name"]
+configure_cmd = platform_config["configure_cmd"]
+make_cmd = platform_config["make_cmd"]
+copy_cmd = platform_config["copy_cmd"]
+copy_include_cmd = platform_config["copy_include_cmd"]
+
+
+build_cmd = f"""
+cd {openssl_src} && \
+{configure_cmd} && \
+{make_cmd} && \
+{copy_cmd} {ssl_lib_name} {crypto_lib_name} {openssl_lib_dir}/ && \
+{copy_include_cmd} {os.path.join(openssl_src, "include")}/. {openssl_include_dir}
+"""
+
+# print(build_cmd)
+
+env.Command(
+    target=[File(os.path.join(openssl_lib_dir, ssl_lib_name)),
+            File(os.path.join(openssl_lib_dir, crypto_lib_name)),
+            Dir(openssl_include_dir)],
+    source=None,
+    action=build_cmd
+)

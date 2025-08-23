@@ -1,0 +1,111 @@
+Import("env", "info")
+
+if info.system == "windows":
+    env = SConscript("../godot-cpp/SConstruct")
+    # 添加头文件路径
+    env.Append(CPPPATH=[
+        "../third_party/openssl/win/include",
+        "../third_party/sqlcipher/win/include",
+        "../src_cpp/"
+    ])
+    # 添加宏定义给编译器
+    env.Append(CPPDEFINES=[
+        "SQLITE_HAS_CODEC",
+        "SQLITE_TEMP_STORE=2",
+        "SQLITE_EXTRA_INIT=sqlcipher_extra_init",
+        "SQLITE_EXTRA_SHUTDOWN=sqlcipher_extra_shutdown",
+    ])
+    # 添加库目录（不含文件名）
+    env.Append(LIBPATH=[
+        "../third_party/sqlcipher/win/lib",
+        "../third_party/openssl/win/lib",
+    ])
+    # 添加要链接的静态库文件名或动态库名
+    # 如果是静态库文件，写完整文件名；如果是系统库，写-l形式
+    env.Append(LIBS=[
+        "libsqlite3.lib",
+        "libssl.lib",
+        "libcrypto.lib",
+        # Windows 系统库
+        "Advapi32.lib",
+        "User32.lib",
+        "Crypt32.lib",
+        "Ws2_32.lib",
+    ])
+
+    sources = Glob("../src_cpp/*.cpp")
+    # 文档数据
+    try:
+        doc_data = env.GodotCPPDocData("../src_cpp/gen/doc_data.gen.cpp", source=Glob("../doc_classes/*.xml"))
+        sources.append(doc_data)
+    except AttributeError:
+        print("Not including class reference as we're targeting a pre-4.3 baseline.")
+
+    # build
+    if env["platform"] == "windows":
+        library = env.SharedLibrary(
+            target="../bin/gdextension",   # -> gdextension.dll + gdextension.lib
+            source=sources,
+            LIBS=env.get("LIBS", []),
+            LIBPATH=env.get("LIBPATH", [])
+        )
+
+    Default(library)
+
+if info.system == "darwin":
+    env = SConscript("../godot-cpp/SConstruct")
+
+    # 添加头文件路径
+    env.Append(CPPPATH=[
+        "../third_party/openssl/mac/include",
+        "../third_party/sqlcipher/mac/include",
+        "../src_cpp/"
+    ])
+
+    # 添加宏定义给编译器
+    env.Append(CPPDEFINES=[
+        "SQLITE_HAS_CODEC",
+        "SQLITE_TEMP_STORE=2",
+        "SQLITE_EXTRA_INIT=sqlcipher_extra_init",
+        "SQLITE_EXTRA_SHUTDOWN=sqlcipher_extra_shutdown",
+    ])
+
+    # 添加库目录（不含文件名）
+    env.Append(LIBPATH=[
+        "../third_party/sqlcipher/mac/lib",
+        "../third_party/openssl/mac/lib",
+    ])
+
+    # 添加要链接的静态库文件名或动态库名
+    # 如果是静态库文件，写完整文件名；如果是系统库，写-l形式
+    env.Append(LIBS=[
+        "libsqlite3.a",   # 也可以直接写完整路径，或改成静态库变量
+        "libssl.a",
+        "libcrypto.a",
+        "dl",
+        "pthread",
+        "z",
+    ])
+
+    sources = Glob("../src_cpp/*.cpp")
+
+    ## docs to cpp for build
+    try:
+        doc_data = env.GodotCPPDocData("../src_cpp/gen/doc_data.gen.cpp", source=Glob("../doc_classes/*.xml"))
+        sources.append(doc_data)
+    except AttributeError:
+        print("Not including class reference as we're targeting a pre-4.3 baseline.")
+
+    ## build
+    if env["platform"] == "macos":
+        if info.machine == "arm64":
+            env.Append(CCFLAGS=["-target", "arm64-apple-macos11"])
+
+        library = env.SharedLibrary(
+            target="bin/arm_gd.framework",
+            source=sources,
+            LIBS=env.get("LIBS", []),
+            LIBPATH=env.get("LIBPATH", [])
+        )
+
+    Default(library)

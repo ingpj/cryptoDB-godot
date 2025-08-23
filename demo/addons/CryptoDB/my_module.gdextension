@@ -1,0 +1,23 @@
+[configuration]
+
+entry_symbol = "my_module_init"
+compatibility_minimum = "4.4.1"
+reloadable = true
+
+[libraries]
+macos.debug = "res://addons/CryptoDB/bin/libarm_gd.framework"
+macos.release = "res://addons/CryptoDB/bin/libarm_gd.framework"
+ios.debug = ""
+ios.release = ""
+windows.debug.x86_64 = "res://addons/CryptoDB/bin/gdextension.dll"
+windows.release.x86_64 = "res://addons/CryptoDB/bin/gdextension.dll"
+android.debug.arm64 = ""
+android.release.arm64 = ""
+
+[dependencies]
+ios.debug = {
+    "":""
+}
+ios.release = {
+    "":""
+}

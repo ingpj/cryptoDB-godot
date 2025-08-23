@@ -1,0 +1,43 @@
+# Godot 4+ specific ignores
+.godot/
+.nomedia
+# pulgin
+# addons/
+
+.vscode
+*.tar.gz
+
+godot-cpp/
+src_cpp/*.os
+src_cpp/*.obj
+
+third_party/openssl/mac/src/
+third_party/openssl/mac/lib/
+third_party/openssl/mac/include/
+third_party/openssl/win/src/
+third_party/openssl/win/lib/
+third_party/openssl/win/include/
+
+third_party/sqlcipher/mac/lib/
+third_party/sqlcipher/mac/src/
+third_party/sqlcipher/mac/include/
+third_party/sqlcipher/win/src/
+third_party/sqlcipher/win/lib/
+third_party/sqlcipher/win/include/
+
+# Godot-specific ignores
+.import/
+export.cfg
+export_credentials.cfg
+
+# Imported translations (automatically generated from CSV files)
+*.translation
+
+*.uid
+*.import
+.DS_Store
+
+# Mono-specific ignores
+.mono/
+data_*/
+mono_crash.*.json

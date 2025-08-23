@@ -1,0 +1,67 @@
+Import("env", "info")
+import os
+from SCons.Script import Dir, File
+
+# 路径
+this_dir = Dir(".").abspath
+sqlcipher_src = os.path.join(this_dir, "src")
+sqlcipher_lib_dir = os.path.join(this_dir, "lib")
+sqlcipher_include_dir = os.path.join(this_dir, "include")
+
+OPENSSL_INCLUDE = r"D:\workspace\godot_sqlite\third_party\openssl\win\include"
+OPENSSL_LIB     = r"D:\workspace\godot_sqlite\third_party\openssl\win\lib"
+LIB_NAME = "sqlite3.dll"
+
+os.makedirs(sqlcipher_lib_dir, exist_ok=True)
+os.makedirs(sqlcipher_include_dir, exist_ok=True)
+
+# 拷贝一份当前环境
+build_env = env.Clone()
+
+# 设置编译器宏和 include 路径
+build_env['ENV'] = os.environ.copy()
+
+# 设置库路径和链接库
+build_env['ENV']['LIB'] = f"{OPENSSL_LIB};" + build_env['ENV'].get('LIB','')
+build_env['ENV']['LINK'] = build_env['ENV'].get('LINK', '') + f" /LIBPATH:{OPENSSL_LIB}"
+
+# 构建命令 - 添加 OPTS 参数来传递 OpenSSL 路径
+VCVARS64 = r'D:\c++\vscommunity\VC\Auxiliary\Build\vcvars64.bat'
+build_cmd = (
+    f'call "{VCVARS64}" && '
+    f'cd /d "{sqlcipher_src}" && '
+    f'set CCOPTS=/DSQLITE_CRYPTO_OPENSSL /DHAVE_STDINT_H /DSQLITE_HAS_CODEC '
+    f'/DSQLITE_EXTRA_INIT=sqlcipher_extra_init '
+    f'/DSQLITE_EXTRA_SHUTDOWN=sqlcipher_extra_shutdown '
+    f'/DSQLITE_TEMP_STORE=2 '
+    f'/I"{OPENSSL_INCLUDE}" && '
+    f'set LTLIBS=libcrypto.lib libssl.lib kernel32.lib user32.lib advapi32.lib crypt32.lib ws2_32.lib && '
+    f'set LTLIBPATHS=/LIBPATH:"{OPENSSL_LIB}" && '
+    f'nmake /f Makefile.msc USE_NATIVE_LIBPATHS=1'
+)
+
+# 构建目标
+build_lib = build_env.Command(
+    target=File(os.path.join(sqlcipher_lib_dir, LIB_NAME)),
+    source=None,
+    action=build_cmd
+)
+
+
+# 要静态库
+installed_static_lib = build_env.Install(
+    sqlcipher_lib_dir,
+    os.path.join(sqlcipher_src, "libsqlite3.lib")
+)
+
+# 拷贝头文件
+installed_includes = build_env.Install(sqlcipher_include_dir,
+                                       os.path.join(sqlcipher_src, "sqlite3.h"))
+
+Default(build_lib, installed_includes, installed_static_lib)
+
+
+# nmake /f Makefile.msc sqlite3.dll USE_NATIVE_LIBPATHS=1 ^
+# OPTS="-DSQLITE_HAS_CODEC -DSQLITE_EXTRA_INIT=sqlcipher_extra_init -DSQLITE_EXTRA_SHUTDOWN=sqlcipher_extra_shutdown -DSQLITE_TEMP_STORE=2 -DSQLITE_CRYPTO_OPENSSL -DHAVE_STDINT_H -ID:\workspace\godot_sqlite\third_party\openssl\win\include" ^
+# CCOPTS="/MT -DSTATIC_BUILD" ^
+# LTLINKOPTS="-LIBPATH:D:\workspace\godot_sqlite\third_party\openssl\win\lib libcrypto.lib libssl.lib kernel32.lib user32.lib advapi32.lib crypt32.lib ws2_32.lib"

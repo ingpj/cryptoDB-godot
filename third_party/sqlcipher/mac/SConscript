@@ -1,0 +1,71 @@
+Import("env", "info")
+import os,sys
+
+# Mac M1 特殊处理
+if info.machine in ("arm64", "aarch64"):
+    configure_cmd = (
+        './configure --with-tempstore=yes --disable-shared --enable-static '
+        'CFLAGS="-DSQLITE_HAS_CODEC '
+        '-DSQLITE_EXTRA_INIT=sqlcipher_extra_init '
+        '-DSQLITE_EXTRA_SHUTDOWN=sqlcipher_extra_shutdown '
+        '-I../../../openssl/mac/include" '
+        'LDFLAGS="../../../openssl/mac/lib/libcrypto.a -lm -ldl -lpthread -lz"'
+    )
+else:
+    configure_cmd = (
+        './configure --with-tempstore=yes --disable-shared --enable-static '
+        'CFLAGS="-DSQLITE_HAS_CODEC '
+        '-DSQLITE_EXTRA_INIT=sqlcipher_extra_init '
+        '-DSQLITE_EXTRA_SHUTDOWN=sqlcipher_extra_shutdown '
+        '-I../../../openssl/mac/include" '
+        'LDFLAGS="../../../openssl/mac/lib/libcrypto.a -lm -ldl -lpthread -lz"'
+    )
+
+platform_config = {
+    "platform": "darwin",
+    "configure_cmd": configure_cmd,
+    "lib_name": "libsqlite3.a",  # 改成 sqlcipher 静态库名字
+    "make_cmd": "make -j",
+    "copy_cmd": "cp",
+    "copy_include_cmd": "cp -r",
+    "linkflags_extra": ["-ldl", "-lpthread", "-lz"],
+}
+
+
+
+this_dir = Dir(".").abspath
+
+sqlcipher_src = os.path.join(this_dir, "src")
+sqlcipher_lib_dir = os.path.join(this_dir, "lib")
+sqlcipher_include_dir = os.path.join(this_dir, "include")
+
+if not os.path.exists(sqlcipher_lib_dir):
+    os.makedirs(sqlcipher_lib_dir)
+
+if not os.path.exists(sqlcipher_include_dir):
+    os.makedirs(sqlcipher_include_dir)
+
+lib_name = platform_config["lib_name"]
+configure_cmd = platform_config["configure_cmd"]
+make_cmd = f'{platform_config["make_cmd"]} {lib_name}'
+copy_cmd = platform_config["copy_cmd"]
+copy_include_cmd = platform_config["copy_include_cmd"]
+
+build_cmd = f"""
+cd {sqlcipher_src} && \
+{configure_cmd} && \
+{make_cmd} && \
+{copy_cmd} {lib_name} {sqlcipher_lib_dir}/ && \
+{copy_include_cmd} {os.path.join(sqlcipher_src, "src")}/. {sqlcipher_include_dir}
+"""
+
+# print(build_cmd)
+
+env.Command(
+    target=[
+        File(os.path.join(sqlcipher_lib_dir, lib_name)),
+        Dir(sqlcipher_include_dir)
+        ],
+    source=None,
+    action=build_cmd
+)

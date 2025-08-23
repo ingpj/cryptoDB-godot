@@ -1,0 +1,210 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<class name="CryptoDB" inherits="RefCounted">
+    <brief_description>
+        基于 SQLCipher 的加密 SQLite 数据库封装类，用于安全存储游戏数据。
+    </brief_description>
+    <description>
+        [b]CryptoDB[/b] 提供加密/明文数据库的打开、查询、事务、元数据访问和维护操作。[br]支持 SQLCipher 特有功能，如重新加密、KDF 调整等。
+		[b]Example usage[/b]:
+		[codeblock]
+        extends Node
+
+        func _ready():
+            var db = CryptoDB.new()
+            var path = "user://test.db"
+            #var key = "MySecretKey123"
+            var key = "NewSecretKey456"
+
+            # 打开数据库
+            if not db.open(path, key):
+                print("Failed to open DB:", db.get_last_error())
+                return
+
+            # -----------------------------
+            # 1. 维护管理
+            # -----------------------------
+            print("--- Maintenance ---")
+            if db.vacuum():
+                print("VACUUM success")
+            else:
+                print("VACUUM failed:", db.get_last_error())
+
+            var backup_path = "user://backup.db"
+            ## 不加密备份成原始db
+            #if db.backup_to(backup_path):
+            ## 带加密备份，设置新密码
+            if db.backup_to(backup_path, "123"):
+                print("Backup success:", backup_path)
+            else:
+                print("Backup failed")
+
+            # -----------------------------
+            # 2. 表操作
+            # -----------------------------
+            print("--- Table Operations ---")
+            db.exec("DROP TABLE IF EXISTS players")
+            db.exec("""
+                CREATE TABLE players (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT,
+                    score INTEGER
+                )
+            """)
+
+            print("Tables:", db.list_tables())
+            print("Columns of 'players':", db.list_columns("players"))
+
+            # -----------------------------
+            # 3. 事务与数据操作
+            # -----------------------------
+            print("--- Transactions & Data ---")
+            db.begin_transaction()
+            db.exec("INSERT INTO players (name, score) VALUES ('Alice', 100)")
+            db.exec("INSERT INTO players (name, score) VALUES ('Bob', 200)")
+            print("Last Insert ID:", db.get_last_insert_rowid())
+            db.commit()
+
+            # 查询数据
+            var result = db.query("SELECT * FROM players")
+            for row in result:
+                print("Row:", row)
+
+            # 测试回滚
+            db.begin_transaction()
+            db.exec("INSERT INTO players (name, score) VALUES ('Charlie', 300)")
+            print("Added Charlie, but will rollback")
+            db.rollback()
+
+            result = db.query("SELECT * FROM players")
+            print("After rollback:")
+            for row in result:
+                print(row)
+
+            # -----------------------------
+            # 4. 高级 SQLCipher 操作
+            # -----------------------------
+            print("--- SQLCipher Advanced ---")
+            print("Cipher Version:", db.get_cipher_version())
+            if db.rekey("NewSecretKey456"):
+                print("Rekey success")
+            else:
+                print("Rekey failed:", db.get_last_error())
+
+            db.close()
+		[/codeblock]
+    </description>
+    <methods>
+
+        <!-- 基础操作 -->
+        <method name="open">
+            <return type="bool" />
+            <param index="0" name="path" type="String" />
+            <param index="1" name="key" type="String" />
+            <description>打开数据库文件并设置加密密钥。</description>
+        </method>
+
+        <method name="close">
+            <return type="void" />
+            <description>关闭数据库连接。</description>
+        </method>
+
+        <method name="query">
+            <return type="Array" />
+            <param index="0" name="sql" type="String" />
+            <description>执行 SQL 查询并返回结果数组，每行为 Dictionary。</description>
+        </method>
+
+        <method name="exec">
+            <return type="bool" />
+            <param index="0" name="sql" type="String" />
+            <description>执行 SQL 语句但不返回数据（如 INSERT/UPDATE/DELETE）。</description>
+        </method>
+
+        <!-- 事务操作 -->
+        <method name="begin_transaction">
+            <return type="bool" />
+            <description>开启事务。</description>
+        </method>
+
+        <method name="commit">
+            <return type="bool" />
+            <description>提交事务。</description>
+        </method>
+
+        <method name="rollback">
+            <return type="bool" />
+            <description>回滚事务。</description>
+        </method>
+
+        <!-- 元数据 -->
+        <method name="get_last_insert_rowid">
+            <return type="int" />
+            <description>获取最后一次插入记录的 RowID。</description>
+        </method>
+
+        <method name="get_changes">
+            <return type="int" />
+            <description>获取最后一次操作影响的行数。</description>
+        </method>
+
+        <method name="list_tables">
+            <return type="Array" />
+            <description>返回数据库中所有表名数组。</description>
+        </method>
+
+        <method name="list_columns">
+            <return type="Array" />
+            <param index="0" name="table" type="String" />
+            <description>返回指定表的列名数组。</description>
+        </method>
+
+        <!-- SQLCipher 特有 -->
+        <method name="rekey">
+            <return type="bool" />
+            <param index="0" name="new_key" type="String" />
+            <description>重新加密数据库，使用新的加密密钥。</description>
+        </method>
+
+        <method name="get_cipher_version">
+            <return type="String" />
+            <description>返回 SQLCipher 的版本号。</description>
+        </method>
+
+        <method name="set_cipher_page_size">
+            <return type="bool" />
+            <param index="0" name="size" type="int" />
+            <description>设置加密页大小（单位字节）。</description>
+        </method>
+
+        <method name="set_kdf_iter">
+            <return type="bool" />
+            <param index="0" name="iterations" type="int" />
+            <description>设置 KDF 迭代次数，提高加密强度。</description>
+        </method>
+
+        <!-- 维护 -->
+        <method name="vacuum">
+            <return type="bool" />
+            <description>清理数据库并重建，提高性能和减少空间占用。</description>
+        </method>
+
+        <method name="backup_to">
+            <return type="bool" />
+            <param index="0" name="path" type="String" />
+            <param index="1" name="key" type="String" default="&quot;&quot;" />
+            <description>备份数据库到指定路径。key 存在则 加密， 否则 明文导出</description>
+        </method>
+
+        <!-- 错误 -->
+        <method name="get_last_error">
+            <return type="String" />
+            <description>获取最后一次数据库操作的错误信息。</description>
+        </method>
+
+        <method name="get_last_error_code">
+            <return type="int" />
+            <description>获取最后一次数据库操作的错误码。</description>
+        </method>
+
+    </methods>
+</class>
