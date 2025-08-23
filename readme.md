@@ -21,11 +21,11 @@
 
 
 ## 编译:
-    - `scons stage=openssl`
-    - `scons stage=sqlcipher`
-    - gdextension:
-      - win: `scons stage=gdextension`
-      - mac: `scons stage=gdextension platform=macos arch=arm64 target=template_release use_lto=yes`
+  - `scons stage=openssl`
+  - `scons stage=sqlcipher`
+  - gdextension:
+    - win: `scons stage=gdextension`
+    - mac: `scons stage=gdextension platform=macos arch=arm64 target=template_release use_lto=yes`
 
 ## 密码加强-可在编译前写在 c++内
 
