@@ -1,5 +1,8 @@
 ## 关于
 使用了sqlcipher 静态集成 并对 godot 进行暴露
+
+支持 windows x64 & mac m1 15.4+
+
 ## 软件
 
 - 编译软件:
