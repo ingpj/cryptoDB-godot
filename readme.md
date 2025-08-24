@@ -3,6 +3,12 @@
 
 支持 windows x64 & mac m1 15.4+
 
+mac 下 addons 下 .framework 需要暂时绕开签名
+```bash
+xattr -dr com.apple.quarantine libarm_gd.framework
+codesign --force --deep --sign - libarm_gd.framework
+```
+
 ## 软件
 
 - 编译软件:
