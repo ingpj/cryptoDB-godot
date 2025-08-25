@@ -12,7 +12,6 @@
         func _ready():
             var db = CryptoDB.new()
             var path = "user://test.db"
-            #var key = "MySecretKey123"
             var key = "NewSecretKey456"
 
             # 打开数据库
@@ -42,8 +41,8 @@
             # 2. 表操作
             # -----------------------------
             print("--- Table Operations ---")
-            db.exec("DROP TABLE IF EXISTS players")
-            db.exec("""
+            db.exec_raw("DROP TABLE IF EXISTS players")
+            db.exec_raw("""
                 CREATE TABLE players (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     name TEXT,
@@ -54,24 +53,18 @@
             print("Tables:", db.list_tables())
             print("Columns of 'players':", db.list_columns("players"))
 
-            # -----------------------------
-            # 3. 事务与数据操作
-            # -----------------------------
-            print("--- Transactions & Data ---")
-            db.begin_transaction()
             db.exec("INSERT INTO players (name, score) VALUES ('Alice', 100)")
             db.exec("INSERT INTO players (name, score) VALUES ('Bob', 200)")
             print("Last Insert ID:", db.get_last_insert_rowid())
-            db.commit()
 
             # 查询数据
             var result = db.query("SELECT * FROM players")
             for row in result:
                 print("Row:", row)
 
-            # 测试回滚
+            # 测试回滚, !exec 自带事务
             db.begin_transaction()
-            db.exec("INSERT INTO players (name, score) VALUES ('Charlie', 300)")
+            db.exec_raw("INSERT INTO players (name, score) VALUES ('Charlie', 300)")
             print("Added Charlie, but will rollback")
             db.rollback()
 
@@ -100,7 +93,9 @@
             <return type="bool" />
             <param index="0" name="path" type="String" />
             <param index="1" name="key" type="String" />
-            <description>打开数据库文件并设置加密密钥。</description>
+            <description>
+                打开数据库文件并设置加密密钥。
+            </description>
         </method>
 
         <method name="close">
@@ -117,23 +112,34 @@
         <method name="exec">
             <return type="bool" />
             <param index="0" name="sql" type="String" />
-            <description>执行 SQL 语句但不返回数据（如 INSERT/UPDATE/DELETE）。</description>
+            <description>
+                [b]执行 SQL 语句但不返回数据（如 INSERT/UPDATE/DELETE）。[/b]
+                [b]不能执行ddl[/b]
+            </description>
+        </method>
+
+        <method name="exec_raw">
+            <return type="bool" />
+            <param index="0" name="sql" type="String" />
+            <description>
+                [b]执行 SQL 语句但不返回数据, 可执行 任意sql [/b]
+            </description>
         </method>
 
         <!-- 事务操作 -->
         <method name="begin_transaction">
             <return type="bool" />
-            <description>开启事务。</description>
+            <description>开启事务。 仅支持 exec_raw, exec 自带事务</description>
         </method>
 
         <method name="commit">
             <return type="bool" />
-            <description>提交事务。</description>
+            <description>提交事务。仅支持 exec_raw, exec 自带事务</description>
         </method>
 
         <method name="rollback">
             <return type="bool" />
-            <description>回滚事务。</description>
+            <description>回滚事务。仅支持 exec_raw, exec 自带事务</description>
         </method>
 
         <!-- 元数据 -->

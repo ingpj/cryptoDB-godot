@@ -19,6 +19,7 @@ void CryptoDB::_bind_methods() {
     ClassDB::bind_method(D_METHOD("close"), &CryptoDB::close);
     ClassDB::bind_method(D_METHOD("query", "sql"), &CryptoDB::query);
     ClassDB::bind_method(D_METHOD("exec", "sql"), &CryptoDB::exec);
+    ClassDB::bind_method(D_METHOD("exec_raw", "sql"), &CryptoDB::exec_raw);
 
     ClassDB::bind_method(D_METHOD("begin_transaction"), &CryptoDB::begin_transaction);
     ClassDB::bind_method(D_METHOD("commit"), &CryptoDB::commit);
@@ -93,9 +94,20 @@ bool CryptoDB::open(const String& path, const String& key) {
     return true;
 }
 
+// 仅允许 query
 Variant CryptoDB::query(const String& sql) {
     if (!db) {
         UtilityFunctions::push_error("Database not open.");
+        return Variant();
+    }
+
+    // 去掉首尾空格，并转大写，仅允许 select、pragma
+    String sql_trimmed = sql.strip_edges().to_upper();
+    if (!sql_trimmed.begins_with("SELECT") &&
+        !sql_trimmed.begins_with("PRAGMA TABLE_INFO") &&
+        !sql_trimmed.begins_with("PRAGMA")) // 根据需要添加其他允许的 PRAGMA
+    {
+        UtilityFunctions::push_error("Only SELECT or allowed PRAGMA statements are allowed in query().");
         return Variant();
     }
 
@@ -164,7 +176,8 @@ void CryptoDB::close() {
     }
 }
 
-bool CryptoDB::exec(const String& sql) {
+// 执行原始 sql
+bool CryptoDB::exec_raw(const String& sql) {
     if (!db) return false;
     char* errMsg = nullptr;
     std::string sql_utf8 = std::string(sql.utf8().get_data());
@@ -177,19 +190,85 @@ bool CryptoDB::exec(const String& sql) {
     return true;
 }
 
+// 执行 dml
+bool CryptoDB::exec(const String& sql) {
+    if (!db) return false;
+
+    // 开始事务
+    if (!exec_raw("BEGIN;")) return false;
+
+    std::string sql_utf8 = std::string(sql.utf8().get_data());
+    const char* sql_tail = sql_utf8.c_str();
+
+    while (*sql_tail != '\0') {
+        sqlite3_stmt* stmt = nullptr;
+        int rc = sqlite3_prepare_v2((sqlite3*)db, sql_tail, -1, &stmt, &sql_tail);
+        if (rc != SQLITE_OK) {
+            exec_raw("ROLLBACK;"); // 出错回滚
+            if (stmt) sqlite3_finalize(stmt);
+            return false;
+        }
+
+        if (!stmt) continue;
+
+        // 拒绝 DDL / DCL / TCL
+        String sql_text = String::utf8(sqlite3_sql(stmt)).strip_edges().to_upper();
+        if (
+            sql_text.begins_with("CREATE") ||
+            sql_text.begins_with("DROP")   ||
+            sql_text.begins_with("ALTER")  ||
+            sql_text.begins_with("TRUNCATE") ||
+            sql_text.begins_with("ATTACH") ||
+            sql_text.begins_with("DETACH") ||
+            sql_text.begins_with("GRANT")  ||
+            sql_text.begins_with("REVOKE") ||
+            sql_text.begins_with("COMMIT") ||
+            sql_text.begins_with("ROLLBACK") ||
+            sql_text.begins_with("SAVEPOINT") ||
+            sql_text.begins_with("BEGIN") ||
+            sql_text.begins_with("END")
+        ){
+            UtilityFunctions::push_error("DDL not allowed in exec().");
+            sqlite3_finalize(stmt);
+            exec_raw("ROLLBACK;"); // 出错回滚
+            return false;
+        }
+
+        rc = sqlite3_step(stmt);
+        if (rc != SQLITE_DONE && rc != SQLITE_ROW) {
+            UtilityFunctions::push_error("SQL execution failed: ", String::utf8(sqlite3_errmsg((sqlite3*)db)));
+            sqlite3_finalize(stmt);
+            exec_raw("ROLLBACK;"); // 出错回滚
+            return false;
+        }
+
+        sqlite3_finalize(stmt);
+    }
+
+    // 全部成功 → 提交事务
+    if (!exec_raw("COMMIT;")) {
+        exec_raw("ROLLBACK;"); // 提交失败也回滚
+        return false;
+    }
+
+    return true;
+}
+
+
+
 // #endregion
 
 // #region 事务
 bool CryptoDB::begin_transaction() {
-    return exec("BEGIN TRANSACTION;");
+    return exec_raw("BEGIN TRANSACTION;");
 }
 
 bool CryptoDB::commit() {
-    return exec("COMMIT;");
+    return exec_raw("COMMIT;");
 }
 
 bool CryptoDB::rollback() {
-    return exec("ROLLBACK;");
+    return exec_raw("ROLLBACK;");
 }
 
 // #endregion
@@ -218,16 +297,20 @@ Array CryptoDB::list_tables() {
     return tables;
 }
 
+
 Array CryptoDB::list_columns(const String &table) {
     Array cols;
     String sql = vformat("PRAGMA table_info(%s);", table);
     Variant res = query(sql);
+
     if (res.get_type() == Variant::ARRAY) {
-        for (int i = 0; i < ((Array)res).size(); i++) {
-            Dictionary row = ((Array)res)[i];
-            if (row.has("name")) {
-                cols.append(row["name"]);
-            }
+        Array rows = res;
+        for (int i = 0; i < rows.size(); i++) {
+            if (rows[i].get_type() != Variant::DICTIONARY) continue;
+            Dictionary row = rows[i];
+
+            // 直接把整个 Dictionary 追加到结果
+            cols.append(row);
         }
     }
     return cols;
@@ -277,7 +360,7 @@ bool CryptoDB::set_cipher_page_size(int size) {
 
 // #region 维护
 bool CryptoDB::vacuum() {
-    return exec("VACUUM;");
+    return exec_raw("VACUUM;");
 }
 
 bool CryptoDB::backup_to(const String &path, const String &key) {

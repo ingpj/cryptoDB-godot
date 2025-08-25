@@ -32,7 +32,8 @@ class CryptoDB : public RefCounted {
         bool open(const String& path, const String& key);
         void close();
         Variant query(const String& sql);
-        bool exec(const String& sql); // 不返回数据
+        bool exec(const String& sql); // 不返回数据 dml
+        bool exec_raw(const String& sql); // 不返回数据 支持 ddl
 
         // 事务
         bool begin_transaction();
