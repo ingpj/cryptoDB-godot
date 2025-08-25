@@ -43,7 +43,6 @@ extends Node
 func _ready():
     var db = CryptoDB.new()
     var path = "user://test.db"
-    #var key = "MySecretKey123"
     var key = "NewSecretKey456"
 
     # 打开数据库
@@ -73,8 +72,8 @@ func _ready():
     # 2. 表操作
     # -----------------------------
     print("--- Table Operations ---")
-    db.exec("DROP TABLE IF EXISTS players")
-    db.exec("""
+    db.exec_raw("DROP TABLE IF EXISTS players")
+    db.exec_raw("""
         CREATE TABLE players (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT,
@@ -85,24 +84,18 @@ func _ready():
     print("Tables:", db.list_tables())
     print("Columns of 'players':", db.list_columns("players"))
 
-    # -----------------------------
-    # 3. 事务与数据操作
-    # -----------------------------
-    print("--- Transactions & Data ---")
-    db.begin_transaction()
     db.exec("INSERT INTO players (name, score) VALUES ('Alice', 100)")
     db.exec("INSERT INTO players (name, score) VALUES ('Bob', 200)")
     print("Last Insert ID:", db.get_last_insert_rowid())
-    db.commit()
 
     # 查询数据
     var result = db.query("SELECT * FROM players")
     for row in result:
         print("Row:", row)
 
-    # 测试回滚
+    # 测试回滚, !exec 自带事务
     db.begin_transaction()
-    db.exec("INSERT INTO players (name, score) VALUES ('Charlie', 300)")
+    db.exec_raw("INSERT INTO players (name, score) VALUES ('Charlie', 300)")
     print("Added Charlie, but will rollback")
     db.rollback()
 
