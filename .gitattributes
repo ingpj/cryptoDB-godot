@@ -1,0 +1,7 @@
+# 所有文本文件自动按 LF 归一化
+* text=auto eol=lf
+
+# 忽略系统生成的垃圾
+.DS_Store       export-ignore
+Thumbs.db       export-ignore
+__MACOSX/       export-ignore
